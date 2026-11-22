@@ -1,6 +1,6 @@
 # Boundary Lab 🌀
 
-**Boundary Lab v0.4** is a local browser-based **classical geometry sandbox** for exploring which constraints are associated with persistent organization. No libraries, server, login, quantum hardware or API keys are required.
+**Boundary Lab v0.5** is a local browser-based **classical geometry sandbox** for exploring which constraints are associated with persistent organization. No libraries, server, login, quantum hardware or API keys are required.
 
 ## Run
 
@@ -44,17 +44,17 @@ Automated seed sweeps; control-vs-treatment comparison; time-window persistence;
 
 The model is neither calibrated to physical units nor claimed to represent a real universe. Its value is in reproducible comparisons between explicit assumptions.
 
-## v0.4: Border field generators
+## v0.5: Border field generators
 
 A new, separately configurable perimeter force is applied to nodes within a chosen distance of any wall. The inward component pushes nodes away from the edge; a small tangential component produces stirring. Pulse amplitude modulates its strength over time (clamped so it never becomes an outward pull). Four luminous generator markers and highlighted strips visualize the active field. These are model rules, not electromagnetic field simulations.
 
 To test whether energy injection prolongs rearrangement, compare identical seeds with **edge field strength 0** versus **1.8** while holding pulse, reach, boundaries and all other controls constant. Note that changes still reset the simulation, preserving controlled comparisons.
 
-## v0.4: Curved perimeter fields
+## v0.5: Curved perimeter fields
 
 **Field arc radius** varies continuously from **0 (flat field fronts)** to **100 (strongly bowed circular arcs)**. The left and right generators use the height of the arena for their circular profiles; the top and bottom use its width. The deepest field extent still comes from **Field reach**. With the arc slider above zero, the field tapers toward the corners instead of occupying a straight strip along the entire wall. The same curved geometry determines both the force zone and its visualization. The Border field storm preset starts with radius 75. Changing the slider resets the seeded experiment to keep comparisons consistent.
 
-## v0.4: orbital diagnostics and browser safeguards
+## v0.5: orbital diagnostics and browser safeguards
 
 - Optional fading particle **trails**, with a configurable trail length (0–80 recorded samples).
 - **Cluster center and radius markers** for groups of three or more nodes, with clockwise/counterclockwise indicators.
@@ -67,3 +67,9 @@ To test whether energy injection prolongs rearrangement, compare identical seeds
 Suggested orbital exploration: set interactions to **Nearby IDs only**, momentum memory to **1**, random disturbance to **0**, and start with **soft collision core 0.5**. Use center markers and trails to see if a group truly rotates versus merely translating.
 
 The statistics remain exploratory numerical diagnostics in a classical toy model.
+
+## v0.5 — Optional pseudo-chemistry
+
+The **Bonding laboratory** preset enables differently sized nodes and persistent explicit spring bonds. Cyan, amber and violet nodes have maximum valence 1, 2 and 3 respectively. Controls configure size scaling, bond selection (all/same/different/complementary), formation distance, break distance, and spring strength. Bond counts, formation events and breakage events are measured and exported. Bond formation is deterministic: closest eligible pairs connect first, with a fixed tie-breaker. Changing physical controls resets to the seed. Old modes remain available with chemistry disabled.
+
+This is exploratory **pseudo-chemistry**, not realistic atomic valence or quantum chemistry. Bonds are spring constraints; no chemical energy or electron behavior is modeled. High bond density can still make crowded clusters. With 180 nodes, pair evaluation is quadratic; low rendering quality is available.
