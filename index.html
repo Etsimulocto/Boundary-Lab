@@ -21,7 +21,7 @@ details{margin-top:10px;color:#b5c7dc}summary{cursor:pointer;color:#e3eef8}
 #status{font-size:12px;color:#8ed4d3}footer{padding:0 16px 20px;font-size:12px;color:#879ab2;max-width:1600px;margin:auto}
 @media(max-width:850px){main{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
 </style></head><body>
-<header><h1>🌀 BOUNDARY LAB <span style="color:#7d91ad;font-size:14px">v0.5</span></h1><p>Minimal geometry. Adjustable constraints. Measurable emergence. No quantum hardware required.</p></header>
+<header><h1>🌀 BOUNDARY LAB <span style="color:#7d91ad;font-size:14px">v0.6</span></h1><p>Minimal geometry. Adjustable constraints. Measurable emergence. No quantum hardware required.</p></header>
 <main>
 <div class="scene">
 <section>
@@ -86,6 +86,9 @@ details{margin-top:10px;color:#b5c7dc}summary{cursor:pointer;color:#e3eef8}
 <div class="field"><label for="bondStrength">Bond strength <span id="bondStrengthLabel"></span></label><input id="bondStrength" type="range" min=".1" max="5" step=".1" value="2.4"></div>
 <div class="field"><label for="bondReach">Bond formation distance <span id="bondReachLabel"></span></label><input id="bondReach" type="range" min="10" max="70" step="1" value="26"></div>
 <div class="field"><label for="bondBreak">Bond breaking distance <span id="bondBreakLabel"></span></label><input id="bondBreak" type="range" min="20" max="140" step="5" value="65"></div>
+<div class="field"><label for="bondDecay">Bond decay (per 10k ticks) <span id="bondDecayLabel"></span></label><input id="bondDecay" type="range" min="0" max="20" step=".5" value="0"></div>
+<div class="field"><label for="stressBreak">Stress break sensitivity <span id="stressBreakLabel"></span></label><input id="stressBreak" type="range" min="0" max="10" step=".1" value="0"></div>
+<p style="font-size:11px">Broken pairs have a 20-tick cooldown before rebonding. Decay and stress can cause chains to reconfigure.</p>
 <p style="font-size:11px">Cyan: 1 bond · amber: 2 bonds · violet: 3 bonds. Solid gold lines are persistent bonds.</p>
 </div>
 <div class="note"><strong>Experimental integrity:</strong> Every change resets the run. Keep the same seed when comparing one variable. A seed controls pseudo-randomness; it does not guarantee causal inference by itself.</div>
@@ -95,5 +98,5 @@ details{margin-top:10px;color:#b5c7dc}summary{cursor:pointer;color:#e3eef8}
 <details><summary>Method</summary><p style="margin-top:8px">Compare a control run against a changed rule with identical seed and starting node count. Repeat across many seeds. Track cluster growth, link persistence and entropy, then inspect whether the differences survive replication.</p></details>
 </div>
 </aside>
-</main><footer>Boundary Lab · v0.5 · Research sandbox · All calculations run locally in your browser.</footer>
+</main><footer>Boundary Lab · v0.6 · Research sandbox · All calculations run locally in your browser.</footer>
 <script src="app.js"></script></body></html>
