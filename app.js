@@ -1,0 +1,113 @@
+/* Boundary Lab v0.1 — deterministic geometric sandbox.
+   An exploratory classical model, not a quantum-field simulation.
+   No hidden physical constants or external libraries.
+*/
+"use strict";
+const $ = id => document.getElementById(id);
+const canvas=$("world"), ctx=canvas.getContext("2d");
+const plot=$("plot"), pc=plot.getContext("2d");
+const W=900,H=540,TAU=Math.PI*2;
+const controls=["seed","count","speed","range","attract","repel","memory","noise","boundary","topology","mutation"];
+let state, running=false, frame=0, samples=[], baseline=null;
+let fpsClock=0, lastTick=0;
+function rng(seed){let a=(seed>>>0)||1;return ()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
+function setting(){return Object.fromEntries(controls.map(k=>[k,["boundary","topology"].includes(k)?$(k).value:Number($(k).value)]));}
+function randn(r){return (r()+r()+r()+r()-2)*1.73205;}
+function initialize(){
+ const c=setting(),r=rng(c.seed);state={c,r,t:0,particles:[],edges:new Set(),prevEdges:new Set(),history:[]};
+ for(let i=0;i<c.count;i++) state.particles.push({x:35+r()*(W-70),y:35+r()*(H-70),vx:(r()-.5)*c.speed,vy:(r()-.5)*c.speed,id:i,kind:Math.floor(r()*3),alive:true});
+ samples=[];frame=0;baseline=null;running=false;$("play").textContent="▶ Run";draw();measure(true);status("Reset with seed "+c.seed);
+}
+function dist(a,b,c){
+ let dx=b.x-a.x,dy=b.y-a.y;
+ if(c.boundary==="wrap"){if(dx>W/2)dx-=W;if(dx< -W/2)dx+=W;if(dy>H/2)dy-=H;if(dy< -H/2)dy+=H;}
+ return [dx,dy,Math.max(0.0001,Math.hypot(dx,dy))];
+}
+function pairAllowed(a,b,c){
+ return c.topology==="all" || (c.topology==="same" && a.kind===b.kind) || (c.topology==="near-id" && Math.abs(a.id-b.id)<=2);
+}
+function tick(){
+ const {c,r,particles:p}=state, forces=p.map(()=>[0,0]);state.prevEdges=state.edges;state.edges=new Set();
+ for(let i=0;i<p.length;i++)for(let j=i+1;j<p.length;j++){
+  if(!p[i].alive||!p[j].alive||!pairAllowed(p[i],p[j],c))continue;
+  const [dx,dy,d]=dist(p[i],p[j],c);if(d>c.range)continue;
+  let f=(c.attract*(1-d/c.range)-c.repel*Math.pow(Math.max(0,1-d/24),2))*0.026;
+  f=Math.max(-0.16,Math.min(0.16,f));
+  const fx=f*dx/d,fy=f*dy/d;forces[i][0]+=fx;forces[i][1]+=fy;forces[j][0]-=fx;forces[j][1]-=fy;
+  state.edges.add(i+":"+j);
+ }
+ for(let i=0;i<p.length;i++){
+  const q=p[i];if(!q.alive)continue;
+  q.vx=c.memory*q.vx+forces[i][0]+randn(r)*c.noise*.03;
+  q.vy=c.memory*q.vy+forces[i][1]+randn(r)*c.noise*.03;
+  const max=Math.max(.2,c.speed),v=Math.hypot(q.vx,q.vy);if(v>max){q.vx*=max/v;q.vy*=max/v;}
+  q.x+=q.vx;q.y+=q.vy;
+  if(c.boundary==="wrap"){q.x=(q.x+W)%W;q.y=(q.y+H)%H;}
+  else if(c.boundary==="reflect"){
+   if(q.x<5||q.x>W-5){q.x=Math.max(5,Math.min(W-5,q.x));q.vx*=-1;}
+   if(q.y<5||q.y>H-5){q.y=Math.max(5,Math.min(H-5,q.y));q.vy*=-1;}
+  }else if(q.x<0||q.x>W||q.y<0||q.y>H){q.alive=false;}
+  if(c.mutation>0&&r()<c.mutation/10000)q.kind=(q.kind+1+Math.floor(r()*2))%3;
+ }
+ state.t++;if(state.t%10===0)measure(false);
+}
+function stats(){
+ const p=state.particles.filter(q=>q.alive),n=p.length,edges=state.edges;
+ const parent=Array.from({length:state.particles.length},(_,i)=>i);
+ const root=i=>{while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;};
+ for(const key of edges){const [i,j]=key.split(":").map(Number);parent[root(i)]=root(j);}
+ const counts=new Map();for(const q of p){const k=root(q.id);counts.set(k,(counts.get(k)||0)+1);}
+ const components=[...counts.values()],largest=Math.max(0,...components);
+ let retained=0;for(const key of edges)if(state.prevEdges.has(key))retained++;
+ const kinds=[0,0,0];for(const q of p)kinds[q.kind]++;
+ let entropy=0;for(const count of kinds){if(count){const x=count/(n||1);entropy-=x*Math.log2(x);}}
+ return {time:state.t,alive:n,edges:edges.size,clusters:components.length,largest,retention:edges.size?retained/edges.size:0,diversity:entropy,seed:state.c.seed};
+}
+function measure(first){
+ const s=stats();samples.push(s);if(samples.length>500)samples.shift();
+ for(const [id,value] of Object.entries({mAlive:s.alive,mEdges:s.edges,mClusters:s.clusters,mLargest:s.largest,mRetention:(100*s.retention).toFixed(0)+"%",mDiversity:s.diversity.toFixed(2)})) $(id).textContent=value;
+ plotHistory();
+}
+function draw(){
+ ctx.clearRect(0,0,W,H);ctx.fillStyle="#090f1d";ctx.fillRect(0,0,W,H);
+ ctx.strokeStyle="#17243a";ctx.lineWidth=1;for(let x=0;x<W;x+=30){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}for(let y=0;y<H;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+ const p=state.particles;ctx.lineWidth=.8;
+ for(const e of state.edges){const [i,j]=e.split(":").map(Number),a=p[i],b=p[j];if(!a.alive||!b.alive)continue;const [dx,dy]=dist(a,b,state.c);if(Math.abs(dx)>W/2||Math.abs(dy)>H/2)continue;ctx.strokeStyle="rgba(99,211,214,.17)";ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(a.x+dx,a.y+dy);ctx.stroke();}
+ const palette=["#63d3d6","#f7b96b","#b99bff"];for(const q of p){if(!q.alive)continue;ctx.fillStyle=palette[q.kind];ctx.beginPath();ctx.arc(q.x,q.y,3.8,0,TAU);ctx.fill();}
+ ctx.fillStyle="#9db3cd";ctx.font="13px system-ui";ctx.fillText("TICK "+state.t,14,22);
+}
+function plotHistory(){
+ const w=plot.width,h=plot.height;pc.clearRect(0,0,w,h);pc.fillStyle="#0d1728";pc.fillRect(0,0,w,h);
+ pc.strokeStyle="#23324a";for(let y=20;y<h;y+=30){pc.beginPath();pc.moveTo(0,y);pc.lineTo(w,y);pc.stroke();}
+ const points=samples;const max=Math.max(1,...points.map(s=>s.largest));
+ pc.strokeStyle="#63d3d6";pc.lineWidth=2;pc.beginPath();
+ points.forEach((s,i)=>{const x=(i/Math.max(1,points.length-1))*w,y=h-12-(s.largest/max)*(h-25);i?pc.lineTo(x,y):pc.moveTo(x,y);});pc.stroke();
+ pc.fillStyle="#9db3cd";pc.font="12px system-ui";pc.fillText("Largest connected cluster (autoscaled)",10,15);
+}
+function status(s){$("status").textContent=s;}
+function syncLabels(){for(const id of ["count","speed","range","attract","repel","memory","noise","mutation"])$(id+"Label").textContent=$(id).value;}
+function animate(t){if(running && t-lastTick>=30){tick();draw();lastTick=t;}requestAnimationFrame(animate);}
+$("play").onclick=()=>{running=!running;$("play").textContent=running?"❚❚ Pause":"▶ Run";status(running?"Running":"Paused");};
+$("step").onclick=()=>{running=false;$("play").textContent="▶ Run";tick();draw();status("Advanced one tick");};
+$("reset").onclick=initialize;
+$("randomSeed").onclick=()=>{$("seed").value=Math.floor(Math.random()*1000000000)+1;initialize();};
+for(const id of controls){$(id).addEventListener("change",()=>{syncLabels();initialize();});$(id).addEventListener("input",syncLabels);}
+$("export").onclick=()=>{
+ const payload={about:"Boundary Lab v0.1 classical toy model — no claim of quantum or cosmological validity",configuration:state.c,samples};
+ const a=document.createElement("a"),url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));a.href=url;a.download="boundary-lab-"+state.c.seed+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+$("csv").onclick=()=>{
+ const keys=["time","alive","edges","clusters","largest","retention","diversity","seed"];
+ const csv=[keys.join(","),...samples.map(s=>keys.map(k=>s[k]).join(","))].join("\n");
+ const a=document.createElement("a"),url=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.href=url;a.download="boundary-lab-"+state.c.seed+".csv";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+$("presets").onchange=e=>{
+ const presets={
+  baseline:{attract:0,repel:0,memory:.9,noise:.3,range:75,boundary:"wrap",topology:"all",mutation:0},
+  aggregation:{attract:2.8,repel:.9,memory:.88,noise:.15,range:110,boundary:"wrap",topology:"all",mutation:0},
+  separation:{attract:0,repel:3,memory:.85,noise:.2,range:85,boundary:"reflect",topology:"all",mutation:0},
+  selective:{attract:2.5,repel:.8,memory:.9,noise:.12,range:110,boundary:"wrap",topology:"same",mutation:1},
+  open:{attract:1.6,repel:1.3,memory:.92,noise:.4,range:90,boundary:"open",topology:"all",mutation:0}
+ };const v=presets[e.target.value];if(!v)return;for(const [k,val] of Object.entries(v))$(k).value=val;syncLabels();initialize();
+};
+syncLabels();initialize();requestAnimationFrame(animate);
