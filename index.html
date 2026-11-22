@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Boundary Lab — Emergence Sandbox</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#090e19;color:#e6edf7}
+*{box-sizing:border-box}body{margin:0}header{padding:20px 28px;border-bottom:1px solid #223149;background:#101a2a}
+h1{font-size:24px;margin:0 0 5px}h2{font-size:15px;margin:0 0 12px;color:#81dfe0;text-transform:uppercase;letter-spacing:.08em}
+p{margin:0;color:#a6b5cd;line-height:1.5}main{display:grid;grid-template-columns:minmax(300px,1fr)310px;gap:16px;padding:16px;max-width:1600px;margin:auto}
+section,.panel{border:1px solid #27364e;border-radius:12px;background:#111b2d;padding:16px}
+.scene{min-width:0}canvas{display:block;width:100%;border-radius:8px;border:1px solid #20334d}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+button,select,input{background:#1d2c44;color:#e8f1fb;border:1px solid #39536e;border-radius:7px;padding:8px;font:inherit}
+button{cursor:pointer}button:hover{background:#2c4968}button.primary{background:#156b76;border-color:#2ba9aa}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #68d3d8}
+.field{display:grid;gap:6px;margin:10px 0}label{display:flex;justify-content:space-between;gap:8px;color:#d8e3f2;font-size:13px}
+input[type=range]{width:100%;padding:0;accent-color:#62d0d3}input[type=number]{width:100%}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.stat{padding:10px;border-radius:8px;background:#19263b;min-width:0}.stat strong{display:block;font-size:23px;font-variant-numeric:tabular-nums;color:#f0fafb}
+.stat small{color:#a9bad2}aside{display:grid;gap:14px;align-content:start}
+details{margin-top:10px;color:#b5c7dc}summary{cursor:pointer;color:#e3eef8}
+.note{font-size:12px;padding:10px 12px;background:#1d2637;border-left:3px solid #d9a864;margin-top:12px}
+#status{font-size:12px;color:#8ed4d3}footer{padding:0 16px 20px;font-size:12px;color:#879ab2;max-width:1600px;margin:auto}
+@media(max-width:850px){main{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+</style></head><body>
+<header><h1>🌀 BOUNDARY LAB <span style="color:#7d91ad;font-size:14px">v0.1</span></h1><p>Minimal geometry. Adjustable constraints. Measurable emergence. No quantum hardware required.</p></header>
+<main>
+<div class="scene">
+<section>
+<h2>Environment</h2><canvas id="world" width="900" height="540" aria-label="Simulation visualization of interacting points"></canvas>
+<div class="actions">
+<button id="play" class="primary">▶ Run</button><button id="step">Step +1</button><button id="reset">Reset same seed</button><button id="randomSeed">New seed</button>
+</div><p id="status" role="status"></p>
+</section>
+<section style="margin-top:14px">
+<h2>Measurements</h2>
+<div class="stats">
+<div class="stat"><strong id="mAlive">—</strong><small>Active nodes</small></div>
+<div class="stat"><strong id="mEdges">—</strong><small>Links</small></div>
+<div class="stat"><strong id="mClusters">—</strong><small>Components</small></div>
+<div class="stat"><strong id="mLargest">—</strong><small>Largest cluster</small></div>
+<div class="stat"><strong id="mRetention">—</strong><small>Link retention*</small></div>
+<div class="stat"><strong id="mDiversity">—</strong><small>Type entropy (bits)</small></div>
+</div>
+<canvas id="plot" width="900" height="150" aria-label="Graph of largest connected cluster over time"></canvas>
+<div class="actions"><button id="export">Export JSON</button><button id="csv">Export CSV</button></div>
+<p style="font-size:12px">Measurements sampled every 10 ticks. *Link retention compares consecutive ticks. The largest cluster is a connectivity measurement, not proof of biological or physical emergence.</p>
+</section>
+</div>
+<aside>
+<div class="panel">
+<h2>Experiment setup</h2>
+<div class="field"><label for="presets">Starting hypothesis</label><select id="presets"><option value="">Custom setup</option><option value="baseline">No forces (control)</option><option value="aggregation">Aggregation</option><option value="separation">Repulsion only</option><option value="selective">Selective interaction + mutation</option><option value="open">Open-boundary loss</option></select></div>
+<div class="field"><label for="seed">Random seed (repeatable)</label><input type="number" id="seed" value="4107" min="1" max="999999999" step="1"></div>
+<div class="field"><label for="count">Elements <span id="countLabel"></span></label><input type="range" id="count" min="10" max="180" value="90" step="10"></div>
+<div class="field"><label for="speed">Speed cap <span id="speedLabel"></span></label><input type="range" id="speed" min=".5" max="5" value="2" step=".5"></div>
+<div class="field"><label for="range">Interaction distance <span id="rangeLabel"></span></label><input type="range" id="range" min="20" max="160" value="85" step="5"></div>
+<div class="field"><label for="attract">Attraction <span id="attractLabel"></span></label><input type="range" id="attract" min="0" max="5" value="1.8" step=".1"></div>
+<div class="field"><label for="repel">Short-range repulsion <span id="repelLabel"></span></label><input type="range" id="repel" min="0" max="5" value="1.5" step=".1"></div>
+<div class="field"><label for="memory">Momentum memory <span id="memoryLabel"></span></label><input type="range" id="memory" min="0" max="1" value=".9" step=".01"></div>
+<div class="field"><label for="noise">Random disturbance <span id="noiseLabel"></span></label><input type="range" id="noise" min="0" max="3" value=".3" step=".1"></div>
+<div class="field"><label for="mutation">Type mutation (per 10k ticks) <span id="mutationLabel"></span></label><input type="range" id="mutation" min="0" max="100" value="0" step="1"></div>
+<div class="field"><label for="topology">Allowed interactions</label><select id="topology"><option value="all">All types</option><option value="same">Same type only</option><option value="near-id">Nearby IDs only</option></select></div>
+<div class="field"><label for="boundary">Spatial boundary</label><select id="boundary"><option value="wrap">Wraparound</option><option value="reflect">Reflect</option><option value="open">Open / exit</option></select></div>
+<div class="note"><strong>Experimental integrity:</strong> Every change resets the run. Keep the same seed when comparing one variable. A seed controls pseudo-randomness; it does not guarantee causal inference by itself.</div>
+</div>
+<div class="panel"><h2>Research question</h2><p>Which assumptions are necessary for persistent, organized behavior to emerge in a minimal geometric system?</p>
+<details><summary>What is *not* being claimed</summary><p style="margin-top:8px">This is a classical toy model. Its links are not fundamental physical fields; its nodes are not quantum particles. Visual clusters alone are not evidence for a projector, a simulation, or a theory of the universe.</p></details>
+<details><summary>Method</summary><p style="margin-top:8px">Compare a control run against a changed rule with identical seed and starting node count. Repeat across many seeds. Track cluster growth, link persistence and entropy, then inspect whether the differences survive replication.</p></details>
+</div>
+</aside>
+</main><footer>Boundary Lab · v0.1 · Research sandbox · All calculations run locally in your browser.</footer>
+<script src="app.js"></script></body></html>
