@@ -21,14 +21,22 @@ details{margin-top:10px;color:#b5c7dc}summary{cursor:pointer;color:#e3eef8}
 #status{font-size:12px;color:#8ed4d3}footer{padding:0 16px 20px;font-size:12px;color:#879ab2;max-width:1600px;margin:auto}
 @media(max-width:850px){main{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
 </style></head><body>
-<header><h1>🌀 BOUNDARY LAB <span style="color:#7d91ad;font-size:14px">v0.3</span></h1><p>Minimal geometry. Adjustable constraints. Measurable emergence. No quantum hardware required.</p></header>
+<header><h1>🌀 BOUNDARY LAB <span style="color:#7d91ad;font-size:14px">v0.4</span></h1><p>Minimal geometry. Adjustable constraints. Measurable emergence. No quantum hardware required.</p></header>
 <main>
 <div class="scene">
 <section>
 <h2>Environment</h2><canvas id="world" width="900" height="540" aria-label="Simulation visualization of interacting points"></canvas>
 <div class="actions">
 <button id="play" class="primary">▶ Run</button><button id="step">Step +1</button><button id="reset">Reset same seed</button><button id="randomSeed">New seed</button>
-</div><p id="status" role="status"></p>
+</div>
+<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:10px 0">
+<label style="justify-content:start;gap:5px"><input id="showTrails" type="checkbox" checked> Trails</label>
+<label style="justify-content:start;gap:5px"><input id="showCenters" type="checkbox" checked> Cluster centers</label>
+<label style="justify-content:start;gap:5px"><input id="showLinks" type="checkbox" checked> Links</label>
+<label style="justify-content:start;gap:6px;align-items:center">Render<select id="renderQuality"><option value="auto">Auto</option><option value="low">Low</option></select></label>
+</div>
+<div class="field"><label for="trailLength">Trail length <span id="trailLengthLabel">32</span></label><input id="trailLength" type="range" min="0" max="80" value="32" step="4"></div>
+<p id="status" role="status"></p>
 </section>
 <section style="margin-top:14px">
 <h2>Measurements</h2>
@@ -39,10 +47,13 @@ details{margin-top:10px;color:#b5c7dc}summary{cursor:pointer;color:#e3eef8}
 <div class="stat"><strong id="mLargest">—</strong><small>Largest cluster</small></div>
 <div class="stat"><strong id="mRetention">—</strong><small>Link retention*</small></div>
 <div class="stat"><strong id="mDiversity">—</strong><small>Type entropy (bits)</small></div>
+<div class="stat"><strong id="mSpin">—</strong><small>Mean angular rate</small></div>
+<div class="stat"><strong id="mJoins">—</strong><small>Cluster joins*</small></div>
+<div class="stat"><strong id="mDepartures">—</strong><small>Cluster departures*</small></div>
 </div>
 <canvas id="plot" width="900" height="150" aria-label="Graph of largest connected cluster over time"></canvas>
 <div class="actions"><button id="export">Export JSON</button><button id="csv">Export CSV</button></div>
-<p style="font-size:12px">Measurements sampled every 10 ticks. *Link retention compares consecutive ticks. The largest cluster is a connectivity measurement, not proof of biological or physical emergence.</p>
+<p style="font-size:12px">Measurements sampled every 10 ticks. *Link retention compares consecutive ticks. Cluster joins/departures estimate component membership changes every 10 ticks, not actual orbital capture. The largest cluster is a connectivity measurement, not proof of biological or physical emergence.</p>
 </section>
 </div>
 <aside>
@@ -64,6 +75,7 @@ details{margin-top:10px;color:#b5c7dc}summary{cursor:pointer;color:#e3eef8}
 <div class="field"><label for="fieldPulse">Edge pulse amplitude <span id="fieldPulseLabel"></span></label><input type="range" id="fieldPulse" min="0" max="3" value=".8" step=".1"></div>
 <div class="field"><label for="fieldWidth">Field reach <span id="fieldWidthLabel"></span></label><input type="range" id="fieldWidth" min="10" max="140" value="55" step="5"></div>
 <div class="field"><label for="fieldRadius">Field arc radius <span id="fieldRadiusLabel"></span></label><input type="range" id="fieldRadius" min="0" max="100" value="0" step="5"><p style="font-size:11px">0 = flat field fronts · 100 = maximum circular arc</p></div>
+<div class="field"><label for="softCore">Soft collision core <span id="softCoreLabel"></span></label><input type="range" id="softCore" min="0" max="5" value="0" step=".1"></div>
 <div class="note"><strong>Experimental integrity:</strong> Every change resets the run. Keep the same seed when comparing one variable. A seed controls pseudo-randomness; it does not guarantee causal inference by itself.</div>
 </div>
 <div class="panel"><h2>Research question</h2><p>Which assumptions are necessary for persistent, organized behavior to emerge in a minimal geometric system?</p>
@@ -71,5 +83,5 @@ details{margin-top:10px;color:#b5c7dc}summary{cursor:pointer;color:#e3eef8}
 <details><summary>Method</summary><p style="margin-top:8px">Compare a control run against a changed rule with identical seed and starting node count. Repeat across many seeds. Track cluster growth, link persistence and entropy, then inspect whether the differences survive replication.</p></details>
 </div>
 </aside>
-</main><footer>Boundary Lab · v0.3 · Research sandbox · All calculations run locally in your browser.</footer>
+</main><footer>Boundary Lab · v0.4 · Research sandbox · All calculations run locally in your browser.</footer>
 <script src="app.js"></script></body></html>
