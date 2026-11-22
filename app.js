@@ -1,4 +1,4 @@
-/* Boundary Lab v0.1 — deterministic geometric sandbox.
+/* Boundary Lab v0.2 — deterministic geometric sandbox.
    An exploratory classical model, not a quantum-field simulation.
    No hidden physical constants or external libraries.
 */
@@ -7,7 +7,7 @@ const $ = id => document.getElementById(id);
 const canvas=$("world"), ctx=canvas.getContext("2d");
 const plot=$("plot"), pc=plot.getContext("2d");
 const W=900,H=540,TAU=Math.PI*2;
-const controls=["seed","count","speed","range","attract","repel","memory","noise","boundary","topology","mutation"];
+const controls=["seed","count","speed","range","attract","repel","memory","noise","boundary","topology","mutation","edgeField","fieldPulse","fieldWidth"];
 let state, running=false, frame=0, samples=[], baseline=null;
 let fpsClock=0, lastTick=0;
 function rng(seed){let a=(seed>>>0)||1;return ()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
@@ -26,6 +26,36 @@ function dist(a,b,c){
 function pairAllowed(a,b,c){
  return c.topology==="all" || (c.topology==="same" && a.kind===b.kind) || (c.topology==="near-id" && Math.abs(a.id-b.id)<=2);
 }
+// Four perimeter emitters inject directional force within their field width.
+// Pulse is always nonnegative; tangential shear prevents perfect radial symmetry.
+function edgeFieldForce(q,c,t){
+ if(c.edgeField<=0)return [0,0];
+ const width=Math.max(1,c.fieldWidth);
+ const pulse=Math.max(0,1+c.fieldPulse*Math.sin(t*.03));
+ const base=c.edgeField*pulse;
+ let fx=0,fy=0;
+ if(q.x<width){
+  const s=Math.max(0,1-q.x/width);
+  fx+=base*s;
+  fy+=base*.25*s*Math.sin(q.y*.04+t*.02);
+ }
+ if(q.x>W-width){
+  const s=Math.max(0,1-(W-q.x)/width);
+  fx-=base*s;
+  fy+=base*.25*s*Math.sin(q.y*.04+t*.02+1.7);
+ }
+ if(q.y<width){
+  const s=Math.max(0,1-q.y/width);
+  fy+=base*s;
+  fx+=base*.25*s*Math.sin(q.x*.04+t*.02+3.1);
+ }
+ if(q.y>H-width){
+  const s=Math.max(0,1-(H-q.y)/width);
+  fy-=base*s;
+  fx+=base*.25*s*Math.sin(q.x*.04+t*.02+4.6);
+ }
+ return [fx*.02,fy*.02];
+}
 function tick(){
  const {c,r,particles:p}=state, forces=p.map(()=>[0,0]);state.prevEdges=state.edges;state.edges=new Set();
  for(let i=0;i<p.length;i++)for(let j=i+1;j<p.length;j++){
@@ -38,8 +68,9 @@ function tick(){
  }
  for(let i=0;i<p.length;i++){
   const q=p[i];if(!q.alive)continue;
-  q.vx=c.memory*q.vx+forces[i][0]+randn(r)*c.noise*.03;
-  q.vy=c.memory*q.vy+forces[i][1]+randn(r)*c.noise*.03;
+  const [efx,efy]=edgeFieldForce(q,c,state.t);
+  q.vx=c.memory*q.vx+forces[i][0]+efx+randn(r)*c.noise*.03;
+  q.vy=c.memory*q.vy+forces[i][1]+efy+randn(r)*c.noise*.03;
   const max=Math.max(.2,c.speed),v=Math.hypot(q.vx,q.vy);if(v>max){q.vx*=max/v;q.vy*=max/v;}
   q.x+=q.vx;q.y+=q.vy;
   if(c.boundary==="wrap"){q.x=(q.x+W)%W;q.y=(q.y+H)%H;}
@@ -71,6 +102,25 @@ function measure(first){
 function draw(){
  ctx.clearRect(0,0,W,H);ctx.fillStyle="#090f1d";ctx.fillRect(0,0,W,H);
  ctx.strokeStyle="#17243a";ctx.lineWidth=1;for(let x=0;x<W;x+=30){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}for(let y=0;y<H;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+ // Render field footprint and four active emitter markers.
+ if(state.c.edgeField>0){
+  const w=state.c.fieldWidth,c=state.c;
+  ctx.save();
+  const phase=.5+.5*Math.sin(state.t*.03);
+  ctx.globalAlpha=.06+.08*phase;
+  ctx.fillStyle="#68d3d8";
+  ctx.fillRect(0,0,w,H);ctx.fillRect(W-w,0,w,H);
+  ctx.fillRect(0,0,W,w);ctx.fillRect(0,H-w,W,w);
+  ctx.restore();
+  ctx.save();ctx.strokeStyle="rgba(104,211,216,.5)";ctx.setLineDash([6,6]);
+  ctx.strokeRect(w,w,W-2*w,H-2*w);ctx.setLineDash([]);
+  const spots=[[9,H/2],[W-9,H/2],[W/2,9],[W/2,H-9]];
+  for(const [x,y] of spots){
+   ctx.fillStyle="#8ff7e9";ctx.beginPath();ctx.arc(x,y,5+2*phase,0,TAU);ctx.fill();
+   ctx.strokeStyle="rgba(143,247,233,.45)";ctx.beginPath();ctx.arc(x,y,10+3*phase,0,TAU);ctx.stroke();
+  }
+  ctx.restore();
+ }
  const p=state.particles;ctx.lineWidth=.8;
  for(const e of state.edges){const [i,j]=e.split(":").map(Number),a=p[i],b=p[j];if(!a.alive||!b.alive)continue;const [dx,dy]=dist(a,b,state.c);if(Math.abs(dx)>W/2||Math.abs(dy)>H/2)continue;ctx.strokeStyle="rgba(99,211,214,.17)";ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(a.x+dx,a.y+dy);ctx.stroke();}
  const palette=["#63d3d6","#f7b96b","#b99bff"];for(const q of p){if(!q.alive)continue;ctx.fillStyle=palette[q.kind];ctx.beginPath();ctx.arc(q.x,q.y,3.8,0,TAU);ctx.fill();}
@@ -85,7 +135,7 @@ function plotHistory(){
  pc.fillStyle="#9db3cd";pc.font="12px system-ui";pc.fillText("Largest connected cluster (autoscaled)",10,15);
 }
 function status(s){$("status").textContent=s;}
-function syncLabels(){for(const id of ["count","speed","range","attract","repel","memory","noise","mutation"])$(id+"Label").textContent=$(id).value;}
+function syncLabels(){for(const id of ["count","speed","range","attract","repel","memory","noise","mutation","edgeField","fieldPulse","fieldWidth"])$(id+"Label").textContent=$(id).value;}
 function animate(t){if(running && t-lastTick>=30){tick();draw();lastTick=t;}requestAnimationFrame(animate);}
 $("play").onclick=()=>{running=!running;$("play").textContent=running?"❚❚ Pause":"▶ Run";status(running?"Running":"Paused");};
 $("step").onclick=()=>{running=false;$("play").textContent="▶ Run";tick();draw();status("Advanced one tick");};
@@ -107,7 +157,8 @@ $("presets").onchange=e=>{
   aggregation:{attract:2.8,repel:.9,memory:.88,noise:.15,range:110,boundary:"wrap",topology:"all",mutation:0},
   separation:{attract:0,repel:3,memory:.85,noise:.2,range:85,boundary:"reflect",topology:"all",mutation:0},
   selective:{attract:2.5,repel:.8,memory:.9,noise:.12,range:110,boundary:"wrap",topology:"same",mutation:1},
-  open:{attract:1.6,repel:1.3,memory:.92,noise:.4,range:90,boundary:"open",topology:"all",mutation:0}
- };const v=presets[e.target.value];if(!v)return;for(const [k,val] of Object.entries(v))$(k).value=val;syncLabels();initialize();
+  open:{attract:1.6,repel:1.3,memory:.92,noise:.4,range:90,boundary:"open",topology:"all",mutation:0},
+  fieldstorm:{attract:1.2,repel:1.2,memory:.9,noise:.35,range:90,boundary:"reflect",topology:"all",mutation:10,edgeField:2.2,fieldPulse:1.4,fieldWidth:60}
+ };const v=presets[e.target.value];if(!v)return;for(const [k,val] of Object.entries({edgeField:0,fieldPulse:0,fieldWidth:55,...v}))$(k).value=val;syncLabels();initialize();
 };
 syncLabels();initialize();requestAnimationFrame(animate);
