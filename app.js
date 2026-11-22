@@ -1,4 +1,4 @@
-/* Boundary Lab v0.2 — deterministic geometric sandbox.
+/* Boundary Lab v0.3 — deterministic geometric sandbox.
    An exploratory classical model, not a quantum-field simulation.
    No hidden physical constants or external libraries.
 */
@@ -7,7 +7,7 @@ const $ = id => document.getElementById(id);
 const canvas=$("world"), ctx=canvas.getContext("2d");
 const plot=$("plot"), pc=plot.getContext("2d");
 const W=900,H=540,TAU=Math.PI*2;
-const controls=["seed","count","speed","range","attract","repel","memory","noise","boundary","topology","mutation","edgeField","fieldPulse","fieldWidth"];
+const controls=["seed","count","speed","range","attract","repel","memory","noise","boundary","topology","mutation","edgeField","fieldPulse","fieldWidth","fieldRadius"];
 let state, running=false, frame=0, samples=[], baseline=null;
 let fpsClock=0, lastTick=0;
 function rng(seed){let a=(seed>>>0)||1;return ()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
@@ -26,35 +26,62 @@ function dist(a,b,c){
 function pairAllowed(a,b,c){
  return c.topology==="all" || (c.topology==="same" && a.kind===b.kind) || (c.topology==="near-id" && Math.abs(a.id-b.id)<=2);
 }
-// Four perimeter emitters inject directional force within their field width.
-// Pulse is always nonnegative; tangential shear prevents perfect radial symmetry.
+// Arc geometry shared by the force field and visualization.
+// Radius slider 0 = a flat field front; 100 = a circular arc
+// bulging inward at the emitter, tapering toward the two corners.
+function arcProfile(position,span,curvature){
+ const k=Math.max(0,Math.min(1,curvature/100));
+ if(k===0)return 1;
+ const half=span/2,u=Math.max(-1,Math.min(1,(position-half)/half));
+ const sagitta=half*.85, radius=(half*half+sagitta*sagitta)/(2*sagitta);
+ const arc=Math.max(0,(Math.sqrt(Math.max(0,radius*radius-(u*half)**2))-(radius-sagitta))/sagitta);
+ return (1-k)+k*arc;
+}
+function fieldDepth(position,span,c){
+ return c.fieldWidth*arcProfile(position,span,c.fieldRadius);
+}
 function edgeFieldForce(q,c,t){
  if(c.edgeField<=0)return [0,0];
- const width=Math.max(1,c.fieldWidth);
  const pulse=Math.max(0,1+c.fieldPulse*Math.sin(t*.03));
  const base=c.edgeField*pulse;
  let fx=0,fy=0;
- if(q.x<width){
-  const s=Math.max(0,1-q.x/width);
-  fx+=base*s;
-  fy+=base*.25*s*Math.sin(q.y*.04+t*.02);
+ const left=fieldDepth(q.y,H,c),right=left;
+ const top=fieldDepth(q.x,W,c),bottom=top;
+ if(left>0&&q.x<left){
+  const s=Math.max(0,1-q.x/left);
+  fx+=base*s;fy+=base*.25*s*Math.sin(q.y*.04+t*.02);
  }
- if(q.x>W-width){
-  const s=Math.max(0,1-(W-q.x)/width);
-  fx-=base*s;
-  fy+=base*.25*s*Math.sin(q.y*.04+t*.02+1.7);
+ if(right>0&&q.x>W-right){
+  const s=Math.max(0,1-(W-q.x)/right);
+  fx-=base*s;fy+=base*.25*s*Math.sin(q.y*.04+t*.02+1.7);
  }
- if(q.y<width){
-  const s=Math.max(0,1-q.y/width);
-  fy+=base*s;
-  fx+=base*.25*s*Math.sin(q.x*.04+t*.02+3.1);
+ if(top>0&&q.y<top){
+  const s=Math.max(0,1-q.y/top);
+  fy+=base*s;fx+=base*.25*s*Math.sin(q.x*.04+t*.02+3.1);
  }
- if(q.y>H-width){
-  const s=Math.max(0,1-(H-q.y)/width);
-  fy-=base*s;
-  fx+=base*.25*s*Math.sin(q.x*.04+t*.02+4.6);
+ if(bottom>0&&q.y>H-bottom){
+  const s=Math.max(0,1-(H-q.y)/bottom);
+  fy-=base*s;fx+=base*.25*s*Math.sin(q.x*.04+t*.02+4.6);
  }
  return [fx*.02,fy*.02];
+}
+// Filled polygons and dashed fronts use exactly the same arc geometry
+// as the force calculation, avoiding a misleading UI-only curvature.
+function drawFieldRegion(side,c){
+ const n=72;
+ const horizontal=side==="top"||side==="bottom";
+ const span=horizontal?W:H;
+ const p=i=>{const v=span*i/n,d=fieldDepth(v,span,c);
+  if(side==="top")return [v,d];
+  if(side==="bottom")return [v,H-d];
+  if(side==="left")return [d,v];
+  return [W-d,v];
+ };
+ const outerStart=side==="top"?[0,0]:side==="bottom"?[0,H]:side==="left"?[0,0]:[W,0];
+ const outerEnd=side==="top"?[W,0]:side==="bottom"?[W,H]:side==="left"?[0,H]:[W,H];
+ ctx.beginPath();ctx.moveTo(...outerStart);ctx.lineTo(...outerEnd);
+ for(let i=n;i>=0;i--)ctx.lineTo(...p(i));ctx.closePath();ctx.fill();
+ ctx.beginPath();for(let i=0;i<=n;i++){const xy=p(i);if(i===0)ctx.moveTo(...xy);else ctx.lineTo(...xy);}ctx.stroke();
 }
 function tick(){
  const {c,r,particles:p}=state, forces=p.map(()=>[0,0]);state.prevEdges=state.edges;state.edges=new Set();
@@ -102,20 +129,30 @@ function measure(first){
 function draw(){
  ctx.clearRect(0,0,W,H);ctx.fillStyle="#090f1d";ctx.fillRect(0,0,W,H);
  ctx.strokeStyle="#17243a";ctx.lineWidth=1;for(let x=0;x<W;x+=30){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}for(let y=0;y<H;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
- // Render field footprint and four active emitter markers.
+ // Each filled band follows the same circular profile as its applied force.
  if(state.c.edgeField>0){
-  const w=state.c.fieldWidth,c=state.c;
+  const c=state.c,phase=.5+.5*Math.sin(state.t*.03);
   ctx.save();
-  const phase=.5+.5*Math.sin(state.t*.03);
-  ctx.globalAlpha=.06+.08*phase;
   ctx.fillStyle="#68d3d8";
-  ctx.fillRect(0,0,w,H);ctx.fillRect(W-w,0,w,H);
-  ctx.fillRect(0,0,W,w);ctx.fillRect(0,H-w,W,w);
+  ctx.globalAlpha=.06+.08*phase;
+  ctx.strokeStyle="#68d3d8";ctx.lineWidth=1.4;
+  for(const side of ["left","right","top","bottom"])drawFieldRegion(side,c);
   ctx.restore();
-  ctx.save();ctx.strokeStyle="rgba(104,211,216,.5)";ctx.setLineDash([6,6]);
-  ctx.strokeRect(w,w,W-2*w,H-2*w);ctx.setLineDash([]);
-  const spots=[[9,H/2],[W-9,H/2],[W/2,9],[W/2,H-9]];
-  for(const [x,y] of spots){
+  ctx.save();
+  ctx.strokeStyle="rgba(104,211,216,.65)";
+  ctx.setLineDash([6,6]);ctx.lineWidth=1.3;
+  for(const side of ["left","right","top","bottom"]){
+   const horizontal=side==="top"||side==="bottom",span=horizontal?W:H;
+   ctx.beginPath();
+   for(let i=0;i<=72;i++){
+    const v=span*i/72,d=fieldDepth(v,span,c);
+    const xy=side==="top"?[v,d]:side==="bottom"?[v,H-d]:side==="left"?[d,v]:[W-d,v];
+    if(i===0)ctx.moveTo(...xy);else ctx.lineTo(...xy);
+   }
+   ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  for(const [x,y] of [[9,H/2],[W-9,H/2],[W/2,9],[W/2,H-9]]){
    ctx.fillStyle="#8ff7e9";ctx.beginPath();ctx.arc(x,y,5+2*phase,0,TAU);ctx.fill();
    ctx.strokeStyle="rgba(143,247,233,.45)";ctx.beginPath();ctx.arc(x,y,10+3*phase,0,TAU);ctx.stroke();
   }
@@ -135,7 +172,7 @@ function plotHistory(){
  pc.fillStyle="#9db3cd";pc.font="12px system-ui";pc.fillText("Largest connected cluster (autoscaled)",10,15);
 }
 function status(s){$("status").textContent=s;}
-function syncLabels(){for(const id of ["count","speed","range","attract","repel","memory","noise","mutation","edgeField","fieldPulse","fieldWidth"])$(id+"Label").textContent=$(id).value;}
+function syncLabels(){for(const id of ["count","speed","range","attract","repel","memory","noise","mutation","edgeField","fieldPulse","fieldWidth","fieldRadius"])$(id+"Label").textContent=$(id).value;}
 function animate(t){if(running && t-lastTick>=30){tick();draw();lastTick=t;}requestAnimationFrame(animate);}
 $("play").onclick=()=>{running=!running;$("play").textContent=running?"❚❚ Pause":"▶ Run";status(running?"Running":"Paused");};
 $("step").onclick=()=>{running=false;$("play").textContent="▶ Run";tick();draw();status("Advanced one tick");};
@@ -158,7 +195,7 @@ $("presets").onchange=e=>{
   separation:{attract:0,repel:3,memory:.85,noise:.2,range:85,boundary:"reflect",topology:"all",mutation:0},
   selective:{attract:2.5,repel:.8,memory:.9,noise:.12,range:110,boundary:"wrap",topology:"same",mutation:1},
   open:{attract:1.6,repel:1.3,memory:.92,noise:.4,range:90,boundary:"open",topology:"all",mutation:0},
-  fieldstorm:{attract:1.2,repel:1.2,memory:.9,noise:.35,range:90,boundary:"reflect",topology:"all",mutation:10,edgeField:2.2,fieldPulse:1.4,fieldWidth:60}
- };const v=presets[e.target.value];if(!v)return;for(const [k,val] of Object.entries({edgeField:0,fieldPulse:0,fieldWidth:55,...v}))$(k).value=val;syncLabels();initialize();
+  fieldstorm:{attract:1.2,repel:1.2,memory:.9,noise:.35,range:90,boundary:"reflect",topology:"all",mutation:10,edgeField:2.2,fieldPulse:1.4,fieldWidth:60,fieldRadius:75}
+ };const v=presets[e.target.value];if(!v)return;for(const [k,val] of Object.entries({edgeField:0,fieldPulse:0,fieldWidth:55,fieldRadius:0,...v}))$(k).value=val;syncLabels();initialize();
 };
 syncLabels();initialize();requestAnimationFrame(animate);
