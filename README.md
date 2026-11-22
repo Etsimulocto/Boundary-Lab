@@ -1,6 +1,6 @@
 # Boundary Lab 🌀
 
-**Boundary Lab v0.1** is a local browser-based **classical geometry sandbox** for exploring which constraints are associated with persistent organization. No libraries, server, login, quantum hardware or API keys are required.
+**Boundary Lab v0.2** is a local browser-based **classical geometry sandbox** for exploring which constraints are associated with persistent organization. No libraries, server, login, quantum hardware or API keys are required.
 
 ## Run
 
@@ -12,7 +12,8 @@ Download or clone this repository and open `index.html` in a modern browser. Cli
 - Attraction, short-range repulsion, interaction radius, speed, momentum memory, noise and category mutation
 - Link topology: all elements, same-type only or nearby IDs
 - Boundaries: wraparound, reflection or open exits
-- Presets: no-forces control, aggregation, repulsion, selective interactions and open-boundary loss
+- Four perimeter field emitters with inward force, pulsing intensity, tangential shear and adjustable reach
+- Presets: no-forces control, aggregation, repulsion, selective interactions and open-boundary loss and border field storm
 - Repeatable seeds; JSON and CSV exports
 
 ## Measurements
@@ -42,3 +43,9 @@ A classical processor can model alternative rules even though the processor itse
 Automated seed sweeps; control-vs-treatment comparison; time-window persistence; null models; significance and effect-size reporting; unit tests; parameter heatmaps; optional quantum circuit experiments.
 
 The model is neither calibrated to physical units nor claimed to represent a real universe. Its value is in reproducible comparisons between explicit assumptions.
+
+## v0.2: Border field generators
+
+A new, separately configurable perimeter force is applied to nodes within a chosen distance of any wall. The inward component pushes nodes away from the edge; a small tangential component produces stirring. Pulse amplitude modulates its strength over time (clamped so it never becomes an outward pull). Four luminous generator markers and highlighted strips visualize the active field. These are model rules, not electromagnetic field simulations.
+
+To test whether energy injection prolongs rearrangement, compare identical seeds with **edge field strength 0** versus **1.8** while holding pulse, reach, boundaries and all other controls constant. Note that changes still reset the simulation, preserving controlled comparisons.
