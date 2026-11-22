@@ -1,4 +1,4 @@
-/* Boundary Lab v0.4 — deterministic geometric sandbox.
+/* Boundary Lab v0.5 — deterministic geometric sandbox.
    An exploratory classical model, not a quantum-field simulation.
    No hidden physical constants or external libraries.
 */
@@ -7,7 +7,7 @@ const $ = id => document.getElementById(id);
 const canvas=$("world"), ctx=canvas.getContext("2d");
 const plot=$("plot"), pc=plot.getContext("2d");
 const W=900,H=540,TAU=Math.PI*2;
-const controls=["seed","count","speed","range","attract","repel","memory","noise","boundary","topology","mutation","edgeField","fieldPulse","fieldWidth","fieldRadius","softCore"];
+const controls=["seed","count","speed","range","attract","repel","memory","noise","boundary","topology","mutation","edgeField","fieldPulse","fieldWidth","fieldRadius","softCore","chemistry","bondStrength","bondReach","bondBreak","sizeScale","bondPreference"];
 let state, running=false, frame=0, samples=[], baseline=null;
 let fpsClock=0, lastTick=0;
 const palette=["#63d3d6","#f7b96b","#b99bff"];
@@ -22,10 +22,10 @@ function updateDisplay(){
 }
 
 function rng(seed){let a=(seed>>>0)||1;return ()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
-function setting(){return Object.fromEntries(controls.map(k=>[k,["boundary","topology"].includes(k)?$(k).value:Number($(k).value)]));}
+function setting(){return Object.fromEntries(controls.map(k=>[k,["boundary","topology","bondPreference"].includes(k)?$(k).value:Number($(k).value)]));}
 function randn(r){return (r()+r()+r()+r()-2)*1.73205;}
 function initialize(){
- const c=setting(),r=rng(c.seed);state={c,r,t:0,particles:[],edges:new Set(),prevEdges:new Set(),history:[]};
+ const c=setting(),r=rng(c.seed);state={c,r,t:0,particles:[],edges:new Set(),prevEdges:new Set(),history:[],bonds:new Map(),bondMade:0,bondBroken:0};
  for(let i=0;i<c.count;i++) state.particles.push({x:35+r()*(W-70),y:35+r()*(H-70),vx:(r()-.5)*c.speed,vy:(r()-.5)*c.speed,id:i,kind:Math.floor(r()*3),alive:true});
  samples=[];frame=0;baseline=null;groups=[];previousGroups=[];joins=0;departures=0;meanSpin=0;
  state.trails=state.particles.map(q=>[[q.x,q.y]]);
@@ -96,6 +96,50 @@ function drawFieldRegion(side,c){
  for(let i=n;i>=0;i--)ctx.lineTo(...p(i));ctx.closePath();ctx.fill();
  ctx.beginPath();for(let i=0;i<=n;i++){const xy=p(i);if(i===0)ctx.moveTo(...xy);else ctx.lineTo(...xy);}ctx.stroke();
 }
+// Experimental pseudo-chemistry: valence 1/2/3, radius 3/5/7.
+// Connections are explicit springs with break conditions, not physical atoms.
+const MAX_VALENCE=[1,2,3], BASE_RADIUS=[3,5,7];
+function bondKey(i,j){return i<j?i+":"+j:j+":"+i;}
+function radiusOf(q,c){return c.chemistry>0?BASE_RADIUS[q.kind]*c.sizeScale:3.8;}
+function compatible(a,b,c){
+ if(c.bondPreference==="same")return a.kind===b.kind;
+ if(c.bondPreference==="different")return a.kind!==b.kind;
+ if(c.bondPreference==="complementary")return (a.kind+b.kind)===2;
+ return true;
+}
+function applyBondChemistry(p,forces,c){
+ const degree=new Uint8Array(p.length);
+ // Existing springs exert a force and break if overstretched.
+ for(const [key,b] of state.bonds){
+  const a=p[b.i],z=p[b.j];
+  if(!a.alive||!z.alive||!compatible(a,z,c)){state.bonds.delete(key);state.bondBroken++;continue;}
+  const [dx,dy,d]=dist(a,z,c);
+  if(d>c.bondBreak || d>c.bondReach*2){
+   state.bonds.delete(key);state.bondBroken++;continue;
+  }
+  degree[b.i]++;degree[b.j]++;
+  const f=Math.max(-.24,Math.min(.24,(d-b.rest)*c.bondStrength*.018));
+  const fx=f*dx/d,fy=f*dy/d;
+  forces[b.i][0]+=fx;forces[b.i][1]+=fy;
+  forces[b.j][0]-=fx;forces[b.j][1]-=fy;
+ }
+ // Form nearest eligible bonds first, under valence limits.
+ const candidates=[];
+ for(let i=0;i<p.length;i++)for(let j=i+1;j<p.length;j++){
+  if(!p[i].alive||!p[j].alive||!pairAllowed(p[i],p[j],c))continue;
+  if(degree[i]>=MAX_VALENCE[p[i].kind]||degree[j]>=MAX_VALENCE[p[j].kind])continue;
+  if(!compatible(p[i],p[j],c)||state.bonds.has(bondKey(i,j)))continue;
+  const d=dist(p[i],p[j],c)[2];
+  if(d<=c.bondReach && d>0)candidates.push({i,j,d});
+ }
+ candidates.sort((a,b)=>a.d-b.d||a.i-b.i||a.j-b.j);
+ for(const b of candidates){
+  if(degree[b.i]>=MAX_VALENCE[p[b.i].kind]||degree[b.j]>=MAX_VALENCE[p[b.j].kind])continue;
+  const rest=(radiusOf(p[b.i],c)+radiusOf(p[b.j],c))*1.55;
+  state.bonds.set(bondKey(b.i,b.j),{i:b.i,j:b.j,rest});
+  degree[b.i]++;degree[b.j]++;state.bondMade++;
+ }
+}
 function tick(){
  const {c,r,particles:p}=state, forces=p.map(()=>[0,0]);state.prevEdges=state.edges;state.edges=new Set();
  for(let i=0;i<p.length;i++)for(let j=i+1;j<p.length;j++){
@@ -107,6 +151,7 @@ function tick(){
   const fx=f*dx/d,fy=f*dy/d;forces[i][0]+=fx;forces[i][1]+=fy;forces[j][0]-=fx;forces[j][1]-=fy;
   if(d<=c.range)state.edges.add(i+":"+j);
  }
+ if(c.chemistry)applyBondChemistry(p,forces,c);
  for(let i=0;i<p.length;i++){
   const q=p[i];if(!q.alive)continue;
   const [efx,efy]=edgeFieldForce(q,c,state.t);
@@ -119,7 +164,7 @@ function tick(){
    if(q.x<5||q.x>W-5){q.x=Math.max(5,Math.min(W-5,q.x));q.vx*=-1;}
    if(q.y<5||q.y>H-5){q.y=Math.max(5,Math.min(H-5,q.y));q.vy*=-1;}
   }else if(q.x<0||q.x>W||q.y<0||q.y>H){q.alive=false;}
-  if(c.mutation>0&&r()<c.mutation/10000)q.kind=(q.kind+1+Math.floor(r()*2))%3;
+  if(c.mutation>0&&r()<c.mutation/10000){q.kind=(q.kind+1+Math.floor(r()*2))%3;}
  }
  state.t++;
  if(state.t%3===0)for(const q of p){if(!q.alive)continue;const hist=state.trails[q.id];hist.push([q.x,q.y]);if(hist.length>81)hist.shift();}
@@ -166,14 +211,15 @@ function stats(){
  return {time:state.t,alive:n,edges:edges.size,clusters:components.length,
   largest:Math.max(0,...components.map(g=>g.length)),
   retention:edges.size?retained/edges.size:0,diversity:entropy,seed:state.c.seed,
-  joins,departures,meanSpin};
+  joins,departures,meanSpin,bonds:state.bonds.size,bondMade:state.bondMade,bondBroken:state.bondBroken};
 }
 function measure(first){
  const s=stats();samples.push(s);if(samples.length>500)samples.shift();
  for(const [id,value] of Object.entries({
   mAlive:s.alive,mEdges:s.edges,mClusters:s.clusters,mLargest:s.largest,
   mRetention:(100*s.retention).toFixed(0)+"%",mDiversity:s.diversity.toFixed(2),
-  mJoins:s.joins,mDepartures:s.departures,mSpin:s.meanSpin.toFixed(4)
+  mJoins:s.joins,mDepartures:s.departures,mSpin:s.meanSpin.toFixed(4),
+  mBonds:s.bonds,mBondMade:s.bondMade,mBondBroken:s.bondBroken
  }))$(id).textContent=value;
  plotHistory();
 }
@@ -225,6 +271,16 @@ function draw(){
  const linkStride=Math.max(1,Math.ceil(state.edges.size/linkLimit));let linkIndex=0;
  if(viz.links)for(const e of state.edges){if(linkIndex++%linkStride!==0)continue;
  const [i,j]=e.split(":").map(Number),a=p[i],b=p[j];if(!a.alive||!b.alive)continue;const [dx,dy]=dist(a,b,state.c);if(Math.abs(dx)>W/2||Math.abs(dy)>H/2)continue;ctx.strokeStyle="rgba(99,211,214,.17)";ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(a.x+dx,a.y+dy);ctx.stroke();}
+ // Real persistent pseudo-bonds, visually distinct from proximity edges.
+ if(state.c.chemistry){
+  ctx.save();ctx.lineWidth=2;ctx.strokeStyle="rgba(255,224,153,.85)";
+  for(const b of state.bonds.values()){
+   const u=p[b.i],v=p[b.j];if(!u.alive||!v.alive)continue;
+   const [dx,dy]=dist(u,v,state.c);
+   ctx.beginPath();ctx.moveTo(u.x,u.y);ctx.lineTo(u.x+dx,u.y+dy);ctx.stroke();
+  }
+  ctx.restore();
+ }
  if(viz.centers){
   ctx.save();ctx.lineWidth=1.1;
   for(const g of groups){if(g.size<3)continue;
@@ -235,7 +291,7 @@ function draw(){
    ctx.fillText(g.size+" "+(Math.abs(g.spin)<.0005?"·":g.spin>0?"↻":"↺"),g.x+9,g.y-8);
   }ctx.restore();
  }
- for(const q of p){if(!q.alive)continue;ctx.fillStyle=palette[q.kind];ctx.beginPath();ctx.arc(q.x,q.y,3.8,0,TAU);ctx.fill();}
+ for(const q of p){if(!q.alive)continue;ctx.fillStyle=palette[q.kind];ctx.beginPath();ctx.arc(q.x,q.y,radiusOf(q,state.c),0,TAU);ctx.fill();}
  ctx.fillStyle="#9db3cd";ctx.font="13px system-ui";ctx.fillText("TICK "+state.t,14,22);
 }
 function plotHistory(){
@@ -247,7 +303,7 @@ function plotHistory(){
  pc.fillStyle="#9db3cd";pc.font="12px system-ui";pc.fillText("Largest connected cluster (autoscaled)",10,15);
 }
 function status(s){$("status").textContent=s;}
-function syncLabels(){for(const id of ["count","speed","range","attract","repel","memory","noise","mutation","edgeField","fieldPulse","fieldWidth","fieldRadius","softCore"])$(id+"Label").textContent=$(id).value;}
+function syncLabels(){for(const id of ["count","speed","range","attract","repel","memory","noise","mutation","edgeField","fieldPulse","fieldWidth","fieldRadius","softCore","chemistry","bondStrength","bondReach","bondBreak","sizeScale"])$(id+"Label").textContent=$(id).value;}
 function animate(t){if(running && t-lastTick>=30){tick();if(viz.quality!=="low"||state.t%2===0)draw();lastTick=t;}requestAnimationFrame(animate);}
 $("play").onclick=()=>{running=!running;$("play").textContent=running?"❚❚ Pause":"▶ Run";status(running?"Running":"Paused");};
 $("step").onclick=()=>{running=false;$("play").textContent="▶ Run";tick();draw();status("Advanced one tick");};
@@ -255,11 +311,11 @@ $("reset").onclick=initialize;
 $("randomSeed").onclick=()=>{$("seed").value=Math.floor(Math.random()*1000000000)+1;initialize();};
 for(const id of controls){$(id).addEventListener("change",()=>{syncLabels();initialize();});$(id).addEventListener("input",syncLabels);}
 $("export").onclick=()=>{
- const payload={about:"Boundary Lab v0.4 classical toy model — no claim of quantum or cosmological validity",configuration:state.c,samples};
+ const payload={about:"Boundary Lab v0.5 classical toy model — no claim of quantum or cosmological validity",configuration:state.c,samples,bonds:[...state.bonds.values()]};
  const a=document.createElement("a"),url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));a.href=url;a.download="boundary-lab-"+state.c.seed+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
 $("csv").onclick=()=>{
- const keys=["time","alive","edges","clusters","largest","retention","diversity","seed","joins","departures","meanSpin"];
+ const keys=["time","alive","edges","clusters","largest","retention","diversity","seed","joins","departures","meanSpin","bonds","bondMade","bondBroken"];
  const csv=[keys.join(","),...samples.map(s=>keys.map(k=>s[k]).join(","))].join("\n");
  const a=document.createElement("a"),url=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.href=url;a.download="boundary-lab-"+state.c.seed+".csv";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
@@ -270,8 +326,9 @@ $("presets").onchange=e=>{
   separation:{attract:0,repel:3,memory:.85,noise:.2,range:85,boundary:"reflect",topology:"all",mutation:0},
   selective:{attract:2.5,repel:.8,memory:.9,noise:.12,range:110,boundary:"wrap",topology:"same",mutation:1},
   open:{attract:1.6,repel:1.3,memory:.92,noise:.4,range:90,boundary:"open",topology:"all",mutation:0},
-  fieldstorm:{attract:1.2,repel:1.2,memory:.9,noise:.35,range:90,boundary:"reflect",topology:"all",mutation:10,edgeField:2.2,fieldPulse:1.4,fieldWidth:60,fieldRadius:75,softCore:.6}
- };const v=presets[e.target.value];if(!v)return;for(const [k,val] of Object.entries({edgeField:0,fieldPulse:0,fieldWidth:55,fieldRadius:0,softCore:0,...v}))$(k).value=val;syncLabels();initialize();
+  chemistryLab:{attract:.6,repel:1.2,memory:.86,noise:.15,range:75,boundary:"reflect",topology:"all",mutation:0,edgeField:1.1,fieldPulse:.8,fieldWidth:70,fieldRadius:70,softCore:1.4,chemistry:1,bondStrength:2.4,bondReach:26,bondBreak:65,sizeScale:1,bondPreference:"all"},
+  fieldstorm:{attract:1.2,repel:1.2,memory:.9,noise:.35,range:90,boundary:"reflect",topology:"all",mutation:10,edgeField:2.2,fieldPulse:1.4,fieldWidth:60,fieldRadius:75,softCore:.6,chemistry:0}
+ };const v=presets[e.target.value];if(!v)return;for(const [k,val] of Object.entries({edgeField:0,fieldPulse:0,fieldWidth:55,fieldRadius:0,softCore:0,chemistry:0,bondStrength:2.4,bondReach:26,bondBreak:65,sizeScale:1,bondPreference:"all",...v}))$(k).value=val;syncLabels();initialize();
 };
 for(const id of ["showTrails","showCenters","showLinks","renderQuality","trailLength"])$(id).addEventListener("change",updateDisplay);
 $("trailLength").addEventListener("input",updateDisplay);
