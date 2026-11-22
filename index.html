@@ -21,7 +21,7 @@ details{margin-top:10px;color:#b5c7dc}summary{cursor:pointer;color:#e3eef8}
 #status{font-size:12px;color:#8ed4d3}footer{padding:0 16px 20px;font-size:12px;color:#879ab2;max-width:1600px;margin:auto}
 @media(max-width:850px){main{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
 </style></head><body>
-<header><h1>🌀 BOUNDARY LAB <span style="color:#7d91ad;font-size:14px">v0.4</span></h1><p>Minimal geometry. Adjustable constraints. Measurable emergence. No quantum hardware required.</p></header>
+<header><h1>🌀 BOUNDARY LAB <span style="color:#7d91ad;font-size:14px">v0.5</span></h1><p>Minimal geometry. Adjustable constraints. Measurable emergence. No quantum hardware required.</p></header>
 <main>
 <div class="scene">
 <section>
@@ -50,6 +50,9 @@ details{margin-top:10px;color:#b5c7dc}summary{cursor:pointer;color:#e3eef8}
 <div class="stat"><strong id="mSpin">—</strong><small>Mean angular rate</small></div>
 <div class="stat"><strong id="mJoins">—</strong><small>Cluster joins*</small></div>
 <div class="stat"><strong id="mDepartures">—</strong><small>Cluster departures*</small></div>
+<div class="stat"><strong id="mBonds">—</strong><small>Active bonds</small></div>
+<div class="stat"><strong id="mBondMade">—</strong><small>Bonds formed</small></div>
+<div class="stat"><strong id="mBondBroken">—</strong><small>Bonds broken</small></div>
 </div>
 <canvas id="plot" width="900" height="150" aria-label="Graph of largest connected cluster over time"></canvas>
 <div class="actions"><button id="export">Export JSON</button><button id="csv">Export CSV</button></div>
@@ -59,7 +62,7 @@ details{margin-top:10px;color:#b5c7dc}summary{cursor:pointer;color:#e3eef8}
 <aside>
 <div class="panel">
 <h2>Experiment setup</h2>
-<div class="field"><label for="presets">Starting hypothesis</label><select id="presets"><option value="">Custom setup</option><option value="baseline">No forces (control)</option><option value="aggregation">Aggregation</option><option value="separation">Repulsion only</option><option value="selective">Selective interaction + mutation</option><option value="open">Open-boundary loss</option><option value="fieldstorm">Border field storm</option></select></div>
+<div class="field"><label for="presets">Starting hypothesis</label><select id="presets"><option value="">Custom setup</option><option value="baseline">No forces (control)</option><option value="aggregation">Aggregation</option><option value="separation">Repulsion only</option><option value="selective">Selective interaction + mutation</option><option value="open">Open-boundary loss</option><option value="fieldstorm">Border field storm</option><option value="chemistryLab">Bonding laboratory</option></select></div>
 <div class="field"><label for="seed">Random seed (repeatable)</label><input type="number" id="seed" value="4107" min="1" max="999999999" step="1"></div>
 <div class="field"><label for="count">Elements <span id="countLabel"></span></label><input type="range" id="count" min="10" max="180" value="90" step="10"></div>
 <div class="field"><label for="speed">Speed cap <span id="speedLabel"></span></label><input type="range" id="speed" min=".5" max="5" value="2" step=".5"></div>
@@ -76,6 +79,15 @@ details{margin-top:10px;color:#b5c7dc}summary{cursor:pointer;color:#e3eef8}
 <div class="field"><label for="fieldWidth">Field reach <span id="fieldWidthLabel"></span></label><input type="range" id="fieldWidth" min="10" max="140" value="55" step="5"></div>
 <div class="field"><label for="fieldRadius">Field arc radius <span id="fieldRadiusLabel"></span></label><input type="range" id="fieldRadius" min="0" max="100" value="0" step="5"><p style="font-size:11px">0 = flat field fronts · 100 = maximum circular arc</p></div>
 <div class="field"><label for="softCore">Soft collision core <span id="softCoreLabel"></span></label><input type="range" id="softCore" min="0" max="5" value="0" step=".1"></div>
+<div style="border-top:1px solid #39536e;margin-top:16px;padding-top:12px"><h2>Experimental chemistry</h2>
+<div class="field"><label for="chemistry">Bonding enabled <span id="chemistryLabel"></span></label><input id="chemistry" type="range" min="0" max="1" step="1" value="0"></div>
+<div class="field"><label for="sizeScale">Element size <span id="sizeScaleLabel"></span></label><input id="sizeScale" type="range" min=".5" max="2" step=".1" value="1"></div>
+<div class="field"><label for="bondPreference">Bond preference</label><select id="bondPreference"><option value="all">Any type</option><option value="same">Same type</option><option value="different">Different types</option><option value="complementary">Complementary (A+C or B+B)</option></select></div>
+<div class="field"><label for="bondStrength">Bond strength <span id="bondStrengthLabel"></span></label><input id="bondStrength" type="range" min=".1" max="5" step=".1" value="2.4"></div>
+<div class="field"><label for="bondReach">Bond formation distance <span id="bondReachLabel"></span></label><input id="bondReach" type="range" min="10" max="70" step="1" value="26"></div>
+<div class="field"><label for="bondBreak">Bond breaking distance <span id="bondBreakLabel"></span></label><input id="bondBreak" type="range" min="20" max="140" step="5" value="65"></div>
+<p style="font-size:11px">Cyan: 1 bond · amber: 2 bonds · violet: 3 bonds. Solid gold lines are persistent bonds.</p>
+</div>
 <div class="note"><strong>Experimental integrity:</strong> Every change resets the run. Keep the same seed when comparing one variable. A seed controls pseudo-randomness; it does not guarantee causal inference by itself.</div>
 </div>
 <div class="panel"><h2>Research question</h2><p>Which assumptions are necessary for persistent, organized behavior to emerge in a minimal geometric system?</p>
@@ -83,5 +95,5 @@ details{margin-top:10px;color:#b5c7dc}summary{cursor:pointer;color:#e3eef8}
 <details><summary>Method</summary><p style="margin-top:8px">Compare a control run against a changed rule with identical seed and starting node count. Repeat across many seeds. Track cluster growth, link persistence and entropy, then inspect whether the differences survive replication.</p></details>
 </div>
 </aside>
-</main><footer>Boundary Lab · v0.4 · Research sandbox · All calculations run locally in your browser.</footer>
+</main><footer>Boundary Lab · v0.5 · Research sandbox · All calculations run locally in your browser.</footer>
 <script src="app.js"></script></body></html>
